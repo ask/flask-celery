@@ -1,14 +1,23 @@
+# -*- coding: utf-8 -*-
+"""
+    flaskext.celery
+    ~~~~~~~~~~~~~~~
+
+    Celery integration for Flask.
+
+    :copyright: (c) 2010 Ask Solem <ask@celeryproject.org>
+    :license: BSD, see LICENSE for more details.
+
+"""
 from __future__ import absolute_import
 
 import os
 
-from flask import g
+from functools import partial
 
 from celery.datastructures import AttributeDict
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
-
-
 
 
 class FlaskLoader(_default.Loader):
@@ -29,31 +38,30 @@ class Celery(object):
         from celery.conf import prepare
         prepare(self.conf, AttributeDict(self.app.config))
 
-
     def create_task_cls(self):
         from celery.backends import default_backend, get_backend_cls
         from celery.task.base import Task
-        conf = self.conf
+        defaults = self.conf
 
         class BaseFlaskTask(Task):
             abstract = True
             app = self.app
-            ignore_result = conf.IGNORE_RESULT
-            serializer = conf.TASK_SERIALIZER
-            rate_limit = conf.DEFAULT_RATE_LIMIT
-            track_started = conf.TRACK_STARTED
-            acks_late = conf.ACKS_LATE
-            backend = get_backend_cls(conf.RESULT_BACKEND)()
+            ignore_result = defaults.IGNORE_RESULT
+            serializer = defaults.TASK_SERIALIZER
+            rate_limit = defaults.DEFAULT_RATE_LIMIT
+            track_started = defaults.TRACK_STARTED
+            acks_late = defaults.ACKS_LATE
+            backend = get_backend_cls(defaults.RESULT_BACKEND)()
 
             @classmethod
-            def apply_async(self, *args, **kwargs):
+            def apply_async(cls, *args, **kwargs):
                 if not kwargs.get("connection") or kwargs.get("publisher"):
-                    kwargs["connection"] = self.establish_connection(
+                    kwargs["connection"] = cls.establish_connection(
                             connect_timeout=kwargs.get("connect_timeout"))
-                return super(BaseFlaskTask, self).apply_async(*args, **kwargs)
+                return super(BaseFlaskTask, cls).apply_async(*args, **kwargs)
 
             @classmethod
-            def establish_connection(self, *args, **kwargs):
+            def establish_connection(cls, *args, **kwargs):
                 from celery.messaging import establish_connection
                 kwargs["defaults"] = conf
                 return establish_connection(*args, **kwargs)
@@ -62,8 +70,11 @@ class Celery(object):
 
     def task(self, *args, **kwargs):
         from celery.decorators import task
-        kwargs.setdefault("base", self.create_task_cls())
-        return task(*args, **kwargs)
+        if len(args) == 1 and callable(args[0]):
+            return task(base=self.create_task_cls())(*args)
+        if "base" not in kwargs:
+            kwargs["base"] = self.create_task_cls()
+            return task(*args, **kwargs)
 
     def Worker(self, **kwargs):
         from celery.bin.celeryd import Worker
