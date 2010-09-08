@@ -36,6 +36,7 @@ class Celery(object):
         conf = self.conf
 
         class BaseFlaskTask(Task):
+            abstract = True
             app = self.app
             ignore_result = conf.IGNORE_RESULT
             serializer = conf.TASK_SERIALIZER
