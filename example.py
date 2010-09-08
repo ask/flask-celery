@@ -7,7 +7,7 @@ app = Flask(__name__)
 celery = Celery(app)
 
 
-@celery.task(name="example.add")
+@celery.task
 def add(x, y):
     return x + y
 
