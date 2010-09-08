@@ -63,7 +63,7 @@ class Celery(object):
             @classmethod
             def establish_connection(cls, *args, **kwargs):
                 from celery.messaging import establish_connection
-                kwargs["defaults"] = conf
+                kwargs["defaults"] = defaults
                 return establish_connection(*args, **kwargs)
 
         return BaseFlaskTask
