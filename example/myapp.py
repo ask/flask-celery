@@ -3,7 +3,10 @@ import sys
 from flask import Flask, request
 from flaskext.celery import Celery
 
-app = Flask(__name__)
+def create_app():
+    return Flask(__name__)
+
+app = create_app()
 celery = Celery(app)
 
 
@@ -30,7 +33,4 @@ def show_result(task_id):
 
 
 if __name__ == "__main__":
-    if "-w" in sys.argv:
-        celery.Worker().run()
-    else:
-        app.run(debug=True)
+    app.run(debug=True)
