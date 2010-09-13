@@ -17,6 +17,7 @@ import os
 from functools import partial, wraps
 
 from celery.datastructures import AttributeDict
+from celery.defaults import DefaultApp
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
@@ -26,36 +27,35 @@ from flaskext import script
 
 class FlaskLoader(_default.Loader):
 
+    def __init__(self, app=None, flask_app=None):
+        self.app = app
+        self.flask_app = flask_app
+
     def read_configuration(self):
         self.configured = True
-        return self.setup_settings(_default.DEFAULT_UNCONFIGURED_SETTINGS)
+        conf = self.flask_app.config if self.flask_app else {}
+        return self.setup_settings(dict(
+                        _default.DEFAULT_UNCONFIGURED_SETTINGS, **conf))
 os.environ.setdefault("CELERY_LOADER", get_full_cls_name(FlaskLoader))
+
+
+class FlaskApp(DefaultApp):
+    pass
 
 
 class Celery(object):
 
     def __init__(self, app):
         self.app = app
-        self.conf = AttributeDict()
         self.app.config.setdefault("CELERY_RESULT_BACKEND", "amqp")
-
-        from celery.conf import prepare
-        prepare(self.conf, AttributeDict(self.app.config))
+        self.cel = FlaskApp()
+        self.cel._loader = FlaskLoader(app=self.cel, flask_app=self.app)
 
     def create_task_cls(self):
-        from celery.backends import default_backend, get_backend_cls
-        from celery.task.base import Task
-        defaults = self.conf
+        from celery.task.base import create_task_cls
 
-        class BaseFlaskTask(Task):
+        class BaseFlaskTask(create_task_cls(self.cel)):
             abstract = True
-            app = self.app
-            ignore_result = defaults.IGNORE_RESULT
-            serializer = defaults.TASK_SERIALIZER
-            rate_limit = defaults.DEFAULT_RATE_LIMIT
-            track_started = defaults.TRACK_STARTED
-            acks_late = defaults.ACKS_LATE
-            backend = get_backend_cls(defaults.RESULT_BACKEND)()
 
             @classmethod
             def apply_async(cls, *args, **kwargs):
@@ -63,12 +63,6 @@ class Celery(object):
                     kwargs["connection"] = cls.establish_connection(
                             connect_timeout=kwargs.get("connect_timeout"))
                 return super(BaseFlaskTask, cls).apply_async(*args, **kwargs)
-
-            @classmethod
-            def establish_connection(cls, *args, **kwargs):
-                from celery.messaging import establish_connection
-                kwargs["defaults"] = defaults
-                return establish_connection(*args, **kwargs)
 
         return BaseFlaskTask
 
@@ -81,13 +75,13 @@ class Celery(object):
             return task(*args, **kwargs)
 
     def Worker(self, **kwargs):
-        from celery.bin.celeryd import Worker
-        kwargs["defaults"] = self.conf
+        from celery.apps.worker import Worker
+        kwargs["app"] = self.cel
         return Worker(**kwargs)
 
     def Beat(self, **kwargs):
-        from celery.bin.celerybeat import Beat
-        kwargs["defaults"] = self.conf
+        from celery.apps.beat import Beat
+        kwargs["app"] = self.cel
         return Beat(**kwargs)
 
 
@@ -129,10 +123,13 @@ class celeryd(script.Command):
     """Runs a Celery worker node."""
 
     def get_options(self):
-        from celery.bin.celeryd import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        from celery.bin.celeryd import WorkerCommand
+        return filter(None, map(to_Option, WorkerCommand().get_options()))
 
     def run(self, **kwargs):
+        for arg_name, arg_value in kwargs.items():
+            if isinstance(arg_value, list) and arg_value:
+                kwargs[arg_name] = arg_value[0]
         celery = Celery(current_app)
         celery.Worker(**kwargs).run()
 
@@ -141,8 +138,8 @@ class celerybeat(script.Command):
     """Runs the Celery periodic task scheduler."""
 
     def get_options(self):
-        from celery.bin.celerybeat import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        from celery.bin.celerybeat import BeatCommand
+        return filter(None, map(to_Option, BeatCommand().get_options()))
 
     def run(self, **kwargs):
         celery = Celery(current_app)
