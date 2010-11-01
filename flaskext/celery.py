@@ -16,8 +16,7 @@ import os
 
 from functools import partial, wraps
 
-from celery.datastructures import AttributeDict
-from celery.defaults import DefaultApp
+import celery
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
@@ -39,50 +38,12 @@ class FlaskLoader(_default.Loader):
 os.environ.setdefault("CELERY_LOADER", get_full_cls_name(FlaskLoader))
 
 
-class FlaskApp(DefaultApp):
-    pass
+class Celery(celery.Celery):
 
-
-class Celery(object):
-
-    def __init__(self, app):
+    def __init__(self, app, **kwargs):
         self.app = app
-        self.app.config.setdefault("CELERY_RESULT_BACKEND", "amqp")
-        self.cel = FlaskApp()
-        self.cel._loader = FlaskLoader(app=self.cel, flask_app=self.app)
-
-    def create_task_cls(self):
-        from celery.task.base import create_task_cls
-
-        class BaseFlaskTask(create_task_cls(self.cel)):
-            abstract = True
-
-            @classmethod
-            def apply_async(cls, *args, **kwargs):
-                if not kwargs.get("connection") or kwargs.get("publisher"):
-                    kwargs["connection"] = cls.establish_connection(
-                            connect_timeout=kwargs.get("connect_timeout"))
-                return super(BaseFlaskTask, cls).apply_async(*args, **kwargs)
-
-        return BaseFlaskTask
-
-    def task(self, *args, **kwargs):
-        from celery.decorators import task
-        if len(args) == 1 and callable(args[0]):
-            return task(base=self.create_task_cls())(*args)
-        if "base" not in kwargs:
-            kwargs["base"] = self.create_task_cls()
-            return task(*args, **kwargs)
-
-    def Worker(self, **kwargs):
-        from celery.apps.worker import Worker
-        kwargs["app"] = self.cel
-        return Worker(**kwargs)
-
-    def Beat(self, **kwargs):
-        from celery.apps.beat import Beat
-        kwargs["app"] = self.cel
-        return Beat(**kwargs)
+        self._loader = FlaskLoader(app=self, flask_app=self.app)
+        super(Celery, self).__init__(**kwargs)
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
@@ -156,6 +117,7 @@ class celeryev(script.Command):
     def run(self, **kwargs):
         celery = Celery(current_app)
         from celery.bin.celeryev import run_celeryev
+        kwargs["app"] = celery
         run_celeryev(**kwargs)
 
 
@@ -168,7 +130,8 @@ class celeryctl(script.Command):
         if not remaining_args:
             remaining_args = ["help"]
         from celery.bin.celeryctl import celeryctl as ctl
-        ctl().execute_from_commandline(remaining_args)
+        celery = Celery(app)
+        ctl(celery).execute_from_commandline(remaining_args)
 
 
 class camqadm(script.Command):
@@ -180,6 +143,8 @@ class camqadm(script.Command):
 
     def run(self, *args, **kwargs):
         from celery.bin.camqadm import AMQPAdmin
+        celery = Celery(current_app)
+        kwargs["app"] = celery
         return AMQPAdmin(*args, **kwargs).run()
 
 
