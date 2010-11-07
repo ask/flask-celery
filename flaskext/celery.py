@@ -63,6 +63,8 @@ def to_Option(option, typemap={"int": int, "float": float, "string": str}):
     action = kwargs["action"]
     if action == "store_true":
         map(kwargs.pop, ("const", "type", "nargs", "metavar", "choices"))
+    elif action == "store":
+        kwargs.pop("nargs")
 
     if kwargs["default"] == ("NO", "DEFAULT"):
         kwargs["default"] = None
