@@ -43,8 +43,8 @@ class Celery(App):
 
     def __init__(self, app, **kwargs):
         self.app = app
-        self._loader = FlaskLoader(app=self, flask_app=self.app)
         super(Celery, self).__init__(**kwargs)
+        self._loader = FlaskLoader(app=self, flask_app=self.app)
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
