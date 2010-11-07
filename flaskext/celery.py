@@ -17,6 +17,7 @@ import os
 from functools import partial, wraps
 
 import celery
+from celery.app import App
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
@@ -38,7 +39,7 @@ class FlaskLoader(_default.Loader):
 os.environ.setdefault("CELERY_LOADER", get_full_cls_name(FlaskLoader))
 
 
-class Celery(celery.Celery):
+class Celery(App):
 
     def __init__(self, app, **kwargs):
         self.app = app
