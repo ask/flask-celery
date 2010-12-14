@@ -21,6 +21,8 @@ from celery.app import App
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
+from werkzeug import cached_property
+
 from flask import current_app
 from flaskext import script
 
@@ -87,41 +89,49 @@ class celeryd(script.Command):
     """Runs a Celery worker node."""
 
     def get_options(self):
-        from celery.bin.celeryd import WorkerCommand
-        return filter(None, map(to_Option, WorkerCommand().get_options()))
+        return filter(None, map(to_Option, self.worker.get_options()))
 
     def run(self, **kwargs):
         for arg_name, arg_value in kwargs.items():
             if isinstance(arg_value, list) and arg_value:
                 kwargs[arg_name] = arg_value[0]
-        celery = Celery(current_app)
-        celery.Worker(**kwargs).run()
+        self.worker.run(**kwargs)
+
+    @cached_property
+    def worker(self):
+        from celery.bin.celeryd import WorkerCommand
+        return WorkerCommand(app=Celery(current_app))
 
 
 class celerybeat(script.Command):
     """Runs the Celery periodic task scheduler."""
 
     def get_options(self):
-        from celery.bin.celerybeat import BeatCommand
-        return filter(None, map(to_Option, BeatCommand().get_options()))
+        return filter(None, map(to_Option, self.beat.get_options()))
 
     def run(self, **kwargs):
-        celery = Celery(current_app)
-        celery.Beat(**kwargs).run()
+        self.beat.run(**kwargs)
+
+    @cached_property
+    def beat(self):
+        from celery.bin.celerybeat import BeatCommand
+        return BeatCommand(app=Celery(current_app))
 
 
 class celeryev(script.Command):
     """Runs the Celery curses event monitor."""
+    command = None
 
     def get_options(self):
-        from celery.bin.celeryev import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return filter(None, map(to_Option, self.ev.get_options()))
 
     def run(self, **kwargs):
-        celery = Celery(current_app)
-        from celery.bin.celeryev import run_celeryev
-        kwargs["app"] = celery
-        run_celeryev(**kwargs)
+        self.ev.run(**kwargs)
+
+    @cached_property
+    def ev(self):
+        from celery.bin.celeryev import EvCommand
+        return EvCommand(app=Celery(current_app))
 
 
 class celeryctl(script.Command):
@@ -141,14 +151,14 @@ class camqadm(script.Command):
     """Runs the Celery AMQP admin shell/utility."""
 
     def get_options(self):
-        from celery.bin.camqadm import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return ()
 
     def run(self, *args, **kwargs):
-        from celery.bin.camqadm import AMQPAdmin
+        from celery.bin.camqadm import AMQPAdminCommand
         celery = Celery(current_app)
         kwargs["app"] = celery
-        return AMQPAdmin(*args, **kwargs).run()
+        print("IN RUN")
+        return AMQPAdminCommand(*args, **kwargs).run()
 
 
 commands = {"celeryd": celeryd(),
