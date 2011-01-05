@@ -23,30 +23,27 @@ from celery.utils import get_full_cls_name
 
 from werkzeug import cached_property
 
-from flask import current_app
 from flaskext import script
 
 
 class FlaskLoader(_default.Loader):
 
-    def __init__(self, app=None, flask_app=None):
-        self.app = app
-        self.flask_app = flask_app
-
     def read_configuration(self):
+        config = self.app.flask_app.config
+        for key, value in _default.DEFAULT_UNCONFIGURED_SETTINGS.items():
+            config.setdefault(key, value)
+        settings = self.setup_settings(config)
         self.configured = True
-        conf = self.flask_app.config if self.flask_app else {}
-        return self.setup_settings(dict(
-                        _default.DEFAULT_UNCONFIGURED_SETTINGS, **conf))
-os.environ.setdefault("CELERY_LOADER", get_full_cls_name(FlaskLoader))
+        return settings
 
 
 class Celery(App):
+    flask_app = None
+    loader_cls = get_full_cls_name(FlaskLoader)
 
-    def __init__(self, app, **kwargs):
-        self.app = app
+    def __init__(self, flask_app, **kwargs):
+        self.flask_app = flask_app
         super(Celery, self).__init__(**kwargs)
-        self._loader = FlaskLoader(app=self, flask_app=self.app)
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
@@ -85,7 +82,14 @@ def to_Option(option, typemap={"int": int, "float": float, "string": str}):
     return script.Option(*args, **kwargs)
 
 
-class celeryd(script.Command):
+class Command(script.Command):
+
+    def __init__(self, app):
+        self.app = app
+        super(Command, self).__init__()
+
+
+class celeryd(Command):
     """Runs a Celery worker node."""
 
     def get_options(self):
@@ -100,10 +104,10 @@ class celeryd(script.Command):
     @cached_property
     def worker(self):
         from celery.bin.celeryd import WorkerCommand
-        return WorkerCommand(app=Celery(current_app))
+        return WorkerCommand(app=Celery(self.app))
 
 
-class celerybeat(script.Command):
+class celerybeat(Command):
     """Runs the Celery periodic task scheduler."""
 
     def get_options(self):
@@ -115,10 +119,10 @@ class celerybeat(script.Command):
     @cached_property
     def beat(self):
         from celery.bin.celerybeat import BeatCommand
-        return BeatCommand(app=Celery(current_app))
+        return BeatCommand(app=Celery(self.app))
 
 
-class celeryev(script.Command):
+class celeryev(Command):
     """Runs the Celery curses event monitor."""
     command = None
 
@@ -131,10 +135,10 @@ class celeryev(script.Command):
     @cached_property
     def ev(self):
         from celery.bin.celeryev import EvCommand
-        return EvCommand(app=Celery(current_app))
+        return EvCommand(app=Celery(self.app))
 
 
-class celeryctl(script.Command):
+class celeryctl(Command):
 
     def get_options(self):
         return ()
@@ -144,29 +148,27 @@ class celeryctl(script.Command):
             remaining_args = ["help"]
         from celery.bin.celeryctl import celeryctl as ctl
         celery = Celery(app)
-        ctl(celery).execute_from_commandline(remaining_args)
+        ctl(celery).execute_from_commandline(
+                ["%s celeryctl" % prog] + remaining_args)
 
 
-class camqadm(script.Command):
+class camqadm(Command):
     """Runs the Celery AMQP admin shell/utility."""
 
     def get_options(self):
         return ()
 
-    def run(self, *args, **kwargs):
+    def handle(self, app, prog, name, remaining_args):
         from celery.bin.camqadm import AMQPAdminCommand
-        celery = Celery(current_app)
-        kwargs["app"] = celery
-        print("IN RUN")
-        return AMQPAdminCommand(*args, **kwargs).run()
+        return AMQPAdminCommand(app=Celery(self.app)).run(*remaining_args)
 
 
-commands = {"celeryd": celeryd(),
-            "celerybeat": celerybeat(),
-            "celeryev": celeryev(),
-            "celeryctl": celeryctl(),
-            "camqadm": camqadm()}
+commands = {"celeryd": celeryd,
+            "celerybeat": celerybeat,
+            "celeryev": celeryev,
+            "celeryctl": celeryctl,
+            "camqadm": camqadm}
 
 def install_commands(manager):
     for name, command in commands.items():
-        manager.add_command(name, command)
+        manager.add_command(name, command(manager.app))
