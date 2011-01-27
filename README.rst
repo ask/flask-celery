@@ -2,9 +2,9 @@
  Flask <-> Celery Integration
 ==============================
 
-Requires Celery_ release21-maint branch
-To use with celery/master, use the flask-celery/celery-app-branch.
-
+This branch requires the Celery_ master branch
+To use with stable celery, please use Flask-Celery/release21-maint
+branch: http://github.com/ask/flask-celery/tree/release21-maint
 
 .. _Celery: http://github.com/ask/celery
 

@@ -4,13 +4,13 @@ from flask import Flask, request
 from flaskext.celery import Celery
 
 def create_app():
-    return Flask(__name__)
+    return Flask("myapp")
 
 app = create_app()
 celery = Celery(app)
 
 
-@celery.task
+@celery.task(name="myapp.add")
 def add(x, y):
     return x + y
 

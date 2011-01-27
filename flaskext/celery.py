@@ -16,79 +16,34 @@ import os
 
 from functools import partial, wraps
 
-from celery.datastructures import AttributeDict
+import celery
+from celery.app import App
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
-from flask import current_app
+from werkzeug import cached_property
+
 from flaskext import script
 
 
 class FlaskLoader(_default.Loader):
 
     def read_configuration(self):
+        config = self.app.flask_app.config
+        for key, value in _default.DEFAULT_UNCONFIGURED_SETTINGS.items():
+            config.setdefault(key, value)
+        settings = self.setup_settings(config)
         self.configured = True
-        return self.setup_settings(_default.DEFAULT_UNCONFIGURED_SETTINGS)
-os.environ.setdefault("CELERY_LOADER", get_full_cls_name(FlaskLoader))
+        return settings
 
 
-class Celery(object):
+class Celery(App):
+    flask_app = None
+    loader_cls = get_full_cls_name(FlaskLoader)
 
-    def __init__(self, app):
-        self.app = app
-        self.conf = AttributeDict()
-        self.app.config.setdefault("CELERY_RESULT_BACKEND", "amqp")
-
-        from celery.conf import prepare
-        prepare(self.conf, AttributeDict(self.app.config))
-
-    def create_task_cls(self):
-        from celery.backends import default_backend, get_backend_cls
-        from celery.task.base import Task
-        defaults = self.conf
-
-        class BaseFlaskTask(Task):
-            abstract = True
-            app = self.app
-            ignore_result = defaults.IGNORE_RESULT
-            serializer = defaults.TASK_SERIALIZER
-            rate_limit = defaults.DEFAULT_RATE_LIMIT
-            track_started = defaults.TRACK_STARTED
-            acks_late = defaults.ACKS_LATE
-            backend = get_backend_cls(defaults.RESULT_BACKEND)()
-
-            @classmethod
-            def apply_async(cls, *args, **kwargs):
-                if not kwargs.get("connection") or kwargs.get("publisher"):
-                    kwargs["connection"] = cls.establish_connection(
-                            connect_timeout=kwargs.get("connect_timeout"))
-                return super(BaseFlaskTask, cls).apply_async(*args, **kwargs)
-
-            @classmethod
-            def establish_connection(cls, *args, **kwargs):
-                from celery.messaging import establish_connection
-                kwargs["defaults"] = defaults
-                return establish_connection(*args, **kwargs)
-
-        return BaseFlaskTask
-
-    def task(self, *args, **kwargs):
-        from celery.decorators import task
-        if len(args) == 1 and callable(args[0]):
-            return task(base=self.create_task_cls())(*args)
-        if "base" not in kwargs:
-            kwargs["base"] = self.create_task_cls()
-            return task(*args, **kwargs)
-
-    def Worker(self, **kwargs):
-        from celery.bin.celeryd import Worker
-        kwargs["defaults"] = self.conf
-        return Worker(**kwargs)
-
-    def Beat(self, **kwargs):
-        from celery.bin.celerybeat import Beat
-        kwargs["defaults"] = self.conf
-        return Beat(**kwargs)
+    def __init__(self, flask_app, **kwargs):
+        self.flask_app = flask_app
+        super(Celery, self).__init__(**kwargs)
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
@@ -107,6 +62,8 @@ def to_Option(option, typemap={"int": int, "float": float, "string": str}):
     action = kwargs["action"]
     if action == "store_true":
         map(kwargs.pop, ("const", "type", "nargs", "metavar", "choices"))
+    elif action == "store":
+        kwargs.pop("nargs")
 
     if kwargs["default"] == ("NO", "DEFAULT"):
         kwargs["default"] = None
@@ -125,44 +82,63 @@ def to_Option(option, typemap={"int": int, "float": float, "string": str}):
     return script.Option(*args, **kwargs)
 
 
-class celeryd(script.Command):
+class Command(script.Command):
+
+    def __init__(self, app):
+        self.app = app
+        super(Command, self).__init__()
+
+
+class celeryd(Command):
     """Runs a Celery worker node."""
 
     def get_options(self):
-        from celery.bin.celeryd import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return filter(None, map(to_Option, self.worker.get_options()))
 
     def run(self, **kwargs):
-        celery = Celery(current_app)
-        celery.Worker(**kwargs).run()
+        for arg_name, arg_value in kwargs.items():
+            if isinstance(arg_value, list) and arg_value:
+                kwargs[arg_name] = arg_value[0]
+        self.worker.run(**kwargs)
+
+    @cached_property
+    def worker(self):
+        from celery.bin.celeryd import WorkerCommand
+        return WorkerCommand(app=Celery(self.app))
 
 
-class celerybeat(script.Command):
+class celerybeat(Command):
     """Runs the Celery periodic task scheduler."""
 
     def get_options(self):
-        from celery.bin.celerybeat import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return filter(None, map(to_Option, self.beat.get_options()))
 
     def run(self, **kwargs):
-        celery = Celery(current_app)
-        celery.Beat(**kwargs).run()
+        self.beat.run(**kwargs)
+
+    @cached_property
+    def beat(self):
+        from celery.bin.celerybeat import BeatCommand
+        return BeatCommand(app=Celery(self.app))
 
 
-class celeryev(script.Command):
+class celeryev(Command):
     """Runs the Celery curses event monitor."""
+    command = None
 
     def get_options(self):
-        from celery.bin.celeryev import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return filter(None, map(to_Option, self.ev.get_options()))
 
     def run(self, **kwargs):
-        celery = Celery(current_app)
-        from celery.bin.celeryev import run_celeryev
-        run_celeryev(**kwargs)
+        self.ev.run(**kwargs)
+
+    @cached_property
+    def ev(self):
+        from celery.bin.celeryev import EvCommand
+        return EvCommand(app=Celery(self.app))
 
 
-class celeryctl(script.Command):
+class celeryctl(Command):
 
     def get_options(self):
         return ()
@@ -171,27 +147,28 @@ class celeryctl(script.Command):
         if not remaining_args:
             remaining_args = ["help"]
         from celery.bin.celeryctl import celeryctl as ctl
-        ctl().execute_from_commandline(remaining_args)
+        celery = Celery(app)
+        ctl(celery).execute_from_commandline(
+                ["%s celeryctl" % prog] + remaining_args)
 
 
-class camqadm(script.Command):
+class camqadm(Command):
     """Runs the Celery AMQP admin shell/utility."""
 
     def get_options(self):
-        from celery.bin.camqadm import OPTION_LIST
-        return filter(None, map(to_Option, OPTION_LIST))
+        return ()
 
-    def run(self, *args, **kwargs):
-        from celery.bin.camqadm import AMQPAdmin
-        return AMQPAdmin(*args, **kwargs).run()
+    def handle(self, app, prog, name, remaining_args):
+        from celery.bin.camqadm import AMQPAdminCommand
+        return AMQPAdminCommand(app=Celery(self.app)).run(*remaining_args)
 
 
-commands = {"celeryd": celeryd(),
-            "celerybeat": celerybeat(),
-            "celeryev": celeryev(),
-            "celeryctl": celeryctl(),
-            "camqadm": camqadm()}
+commands = {"celeryd": celeryd,
+            "celerybeat": celerybeat,
+            "celeryev": celeryev,
+            "celeryctl": celeryctl,
+            "camqadm": camqadm}
 
 def install_commands(manager):
     for name, command in commands.items():
-        manager.add_command(name, command)
+        manager.add_command(name, command(manager.app))
