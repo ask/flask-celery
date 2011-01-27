@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='Flask-Celery',
-    version='2.1',
+    version='2.2.0',
     url='http://github.com/ask/flask-celery/',
     license='BSD',
     author='Ask Solem',
@@ -24,7 +24,7 @@ setup(
     install_requires=[
         'Flask',
         'Flask-Script',
-        'celery',
+        'celery>=2.2.0rc5',
     ],
     classifiers=[
         'Environment :: Web Environment',
