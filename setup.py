@@ -24,7 +24,7 @@ setup(
     install_requires=[
         'Flask',
         'Flask-Script',
-        'celery>=2.2.0rc5',
+        'celery>=2.2.0',
     ],
     classifiers=[
         'Environment :: Web Environment',
