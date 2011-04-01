@@ -17,7 +17,7 @@ import os
 from functools import partial, wraps
 
 import celery
-from celery.app import App
+from celery.app import App, current_app as current_celery
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
@@ -104,7 +104,7 @@ class celeryd(Command):
     @cached_property
     def worker(self):
         from celery.bin.celeryd import WorkerCommand
-        return WorkerCommand(app=Celery(self.app))
+        return WorkerCommand(app=current_celery())
 
 
 class celerybeat(Command):
@@ -119,7 +119,7 @@ class celerybeat(Command):
     @cached_property
     def beat(self):
         from celery.bin.celerybeat import BeatCommand
-        return BeatCommand(app=Celery(self.app))
+        return BeatCommand(app=current_celery())
 
 
 class celeryev(Command):
@@ -135,7 +135,7 @@ class celeryev(Command):
     @cached_property
     def ev(self):
         from celery.bin.celeryev import EvCommand
-        return EvCommand(app=Celery(self.app))
+        return EvCommand(app=current_celery())
 
 
 class celeryctl(Command):
@@ -147,8 +147,7 @@ class celeryctl(Command):
         if not remaining_args:
             remaining_args = ["help"]
         from celery.bin.celeryctl import celeryctl as ctl
-        celery = Celery(app)
-        ctl(celery).execute_from_commandline(
+        ctl(current_celery()).execute_from_commandline(
                 ["%s celeryctl" % prog] + remaining_args)
 
 
@@ -160,7 +159,7 @@ class camqadm(Command):
 
     def handle(self, app, prog, name, remaining_args):
         from celery.bin.camqadm import AMQPAdminCommand
-        return AMQPAdminCommand(app=Celery(self.app)).run(*remaining_args)
+        return AMQPAdminCommand(app=current_celery()).run(*remaining_args)
 
 
 commands = {"celeryd": celeryd,
