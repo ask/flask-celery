@@ -1,12 +1,11 @@
 ==============================
  Flask <-> Celery Integration
 ==============================
+:Version: 2.2.5
 
-This branch requires the Celery_ master branch
-To use with stable celery, please use Flask-Celery/release21-maint
-branch: http://github.com/ask/flask-celery/tree/release21-maint
+Requires `Celery`_ 2.2.0 or later.
 
-.. _Celery: http://github.com/ask/celery
+.. _Celery: http://celeryproject.org
 
 
 See ``example.py`` for example usage.

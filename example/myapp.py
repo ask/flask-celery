@@ -1,7 +1,6 @@
-import sys
-
 from flask import Flask, request
 from flaskext.celery import Celery
+
 
 def create_app():
     return Flask("myapp")

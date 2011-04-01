@@ -12,11 +12,7 @@
 from __future__ import absolute_import
 
 import argparse
-import os
 
-from functools import partial, wraps
-
-import celery
 from celery.app import App, current_app as current_celery
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
@@ -167,6 +163,7 @@ commands = {"celeryd": celeryd,
             "celeryev": celeryev,
             "celeryctl": celeryctl,
             "camqadm": camqadm}
+
 
 def install_commands(manager):
     for name, command in commands.items():
