@@ -1,0 +1,13 @@
+include AUTHORS
+include README.rst
+include MANIFEST.in
+include LICENSE
+include setup.cfg
+recursive-include flaskext *.py
+recursive-include tests *.py
+recursive-include example *.py
+recursive-include requirements *.txt
+prune tox.ini
+prune flaskext/*.pyc
+prune example/*.pyc
+prune tests/*.pyc
