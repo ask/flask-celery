@@ -26,8 +26,6 @@ class FlaskLoader(_default.Loader):
 
     def read_configuration(self):
         config = self.app.flask_app.config
-        for key, value in _default.DEFAULT_UNCONFIGURED_SETTINGS.items():
-            config.setdefault(key, value)
         settings = self.setup_settings(config)
         self.configured = True
         return settings
