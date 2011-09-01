@@ -13,7 +13,7 @@ from __future__ import absolute_import
 
 import argparse
 
-from celery.app import App, current_app as current_celery
+from celery.app import App, AppPickler, current_app as current_celery
 from celery.loaders import default as _default
 from celery.utils import get_full_cls_name
 
@@ -31,17 +31,16 @@ class FlaskLoader(_default.Loader):
         return settings
 
 
-def _unpickle_app(cls, flask_app, main, changes, loader, backend, amqp,
-        events, log, control, accept_magic_kwargs):
-    app = cls(flask_app, main, loader=loader, backend=backend, amqp=amqp,
-                    events=events, log=log, control=control,
-                    set_as_current=False,
-                    accept_magic_kwargs=accept_magic_kwargs)
-    app.conf.update(changes)
-    return app
+class FlaskAppPickler(AppPickler):
+
+    def build_kwargs(self, flask_app, *args):
+        kwargs = self.build_standard_kwargs(*args)
+        kwargs["flask_app"] = flask_app
+        return kwargs
 
 
 class Celery(App):
+    Pickler = FlaskAppPickler
     flask_app = None
     loader_cls = get_full_cls_name(FlaskLoader)
 
@@ -49,11 +48,9 @@ class Celery(App):
         self.flask_app = flask_app
         super(Celery, self).__init__(*args, **kwargs)
 
-    def __reduce__(self):
-        _, args = super(Celery, self).__reduce__()
-        args = list(args)
-        cls, args = args[0], [flask_app] + args[1:]
-        return _unpickle_app, (cls, ) + tuple(args)
+    def __reduce_args__(self):
+        return (self.flask_app, ) + super(Celery, self).__reduce_args__()
+
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
