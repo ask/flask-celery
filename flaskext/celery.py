@@ -31,13 +31,29 @@ class FlaskLoader(_default.Loader):
         return settings
 
 
+def _unpickle_app(cls, flask_app, main, changes, loader, backend, amqp,
+        events, log, control, accept_magic_kwargs):
+    app = cls(flask_app, main, loader=loader, backend=backend, amqp=amqp,
+                    events=events, log=log, control=control,
+                    set_as_current=False,
+                    accept_magic_kwargs=accept_magic_kwargs)
+    app.conf.update(changes)
+    return app
+
+
 class Celery(App):
     flask_app = None
     loader_cls = get_full_cls_name(FlaskLoader)
 
-    def __init__(self, flask_app, **kwargs):
+    def __init__(self, flask_app=None, *args, **kwargs):
         self.flask_app = flask_app
-        super(Celery, self).__init__(**kwargs)
+        super(Celery, self).__init__(*args, **kwargs)
+
+    def __reduce__(self):
+        _, args = super(Celery, self).__reduce__()
+        args = list(args)
+        cls, args = args[0], [flask_app] + args[1:]
+        return _unpickle_app, (cls, ) + tuple(args)
 
 
 def to_Option(option, typemap={"int": int, "float": float, "string": str}):
