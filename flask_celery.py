@@ -19,7 +19,7 @@ from celery.utils import get_full_cls_name
 
 from werkzeug import cached_property
 
-from flaskext import script
+from flask.ext import script
 
 
 class FlaskLoader(_default.Loader):
