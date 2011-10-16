@@ -1,5 +1,5 @@
 from flask import Flask, request
-from flaskext.celery import Celery
+from flask.ext.celery import Celery
 
 
 def create_app():
