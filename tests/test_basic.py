@@ -1,6 +1,6 @@
 import flask
 
-from flaskext import celery
+import flask_celery as celery
 from celery.tests.utils import unittest
 
 

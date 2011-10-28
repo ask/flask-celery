@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    flaskext.celery
-    ~~~~~~~~~~~~~~~
+    flask.ext.celery
+    ~~~~~~~~~~~~~~~~
 
     Celery integration for Flask.
 
-    :copyright: (c) 2010 Ask Solem <ask@celeryproject.org>
+    :copyright: (c) 2010-2011 Ask Solem <ask@celeryproject.org>
     :license: BSD, see LICENSE for more details.
 
 """
