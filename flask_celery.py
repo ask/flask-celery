@@ -19,7 +19,7 @@ from celery.utils import get_full_cls_name
 
 from werkzeug import cached_property
 
-from flask.ext import script
+from flask.ext import script2
 
 
 class FlaskLoader(_default.Loader):
@@ -86,10 +86,10 @@ def to_Option(option, typemap={"int": int, "float": float, "string": str}):
         kwargs.setdefault("nargs", 0)
 
     args = kwargs.pop("_short_opts") + kwargs.pop("_long_opts")
-    return script.Option(*args, **kwargs)
+    return script2.Option(*args, **kwargs)
 
 
-class Command(script.Command):
+class Command(script2.Command):
 
     def __init__(self, app):
         self.app = app
