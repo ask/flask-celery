@@ -21,7 +21,7 @@ To install using easy_install:
     $ easy_install Celery
 
 To install from source:
-
+::
     $ tar xvfz celery-0.0.0.tar.gz
     $ cd celery-0.0.0
     $ python setup.py build
