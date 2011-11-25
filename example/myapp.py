@@ -6,6 +6,7 @@ def create_app():
     return Flask("myapp")
 
 app = create_app()
+app.config.from_pyfile('config.py')
 celery = Celery(app)
 
 
