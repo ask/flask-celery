@@ -1,7 +1,7 @@
 ==============================
  Flask <-> Celery Integration
 ==============================
-:Version: 2.4.0
+:Version: 2.4.1
 
 Requires `Celery`_ 2.3.0 or later, and Flask 0.8 or later.
 
