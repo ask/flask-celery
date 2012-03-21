@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='Flask-Celery',
-    version='2.4.1',
+    version='2.4.2',
     url='http://github.com/ask/flask-celery/',
     license='BSD',
     author='Ask Solem',
