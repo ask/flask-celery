@@ -25,6 +25,11 @@ setup(
         'Flask-Script-fix',
         'celery>=2.3.0',
     ],
+    tests_require=[
+        'nose',
+        'nose-cover3',
+        'mock',
+    ],
     classifiers=[
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
