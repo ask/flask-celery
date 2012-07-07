@@ -5,6 +5,7 @@ Flask-Celery
 Celery integration for Flask
 
 """
+import codecs
 from setuptools import setup
 
 setup(
@@ -15,7 +16,7 @@ setup(
     author='Ask Solem',
     author_email='ask@celeryproject.org',
     description='Celery integration for Flask',
-    long_description=__doc__,
+    long_description=codecs.open('README.rst', 'r', 'utf-8').read(),
     py_modules=['flask_celery'],
     zip_safe=False,
     platforms='any',

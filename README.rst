@@ -19,7 +19,7 @@ Please read the Celery getting started tutorial::
     http://docs.celeryproject.org/en/latest/getting-started/first-steps-with-celery.html
 
 
-You can easily add Celery to your flask application like this::
+You can easily add Celery to your flask application like this:
 
 ``myapp.py``::
 
