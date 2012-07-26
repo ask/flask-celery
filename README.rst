@@ -51,7 +51,7 @@ If you want use the flask configuration as a source for the celery
 configuration you can do that like this::
 
     celery = Celery('myapp')
-    celery.config_from_object(flask_app.config)
+    celery.conf.add_defaults(app.config)
 
 
 If you need access to the request inside your task
@@ -62,8 +62,7 @@ then you can use the test context::
 
     app = Flask('myapp')
     celery = Celery('myapp')
-
-    celery.config_from_object(app.config)
+    celery.conf.add_defaults(app.config)
 
     @celery.task
     def hello():
