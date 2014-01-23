@@ -35,11 +35,7 @@ You can easily add Celery to your flask application like this:
 To start the worker you can then launch the ``celery worker`` command
 by pointing to your ``celery`` app instance::
 
-    $ celery -A myapp worker -l info
-
-(if the app argument (``-A|--app)`` is a module/package instead of an
-attribute
-it will automatically expand into ``myapp.celery``)
+    $ celery -A myapp:celery worker -l info
 
 
 See the commands help screen for more information::
